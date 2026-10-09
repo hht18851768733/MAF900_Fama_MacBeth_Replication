@@ -11,21 +11,17 @@ library(tidyverse)
 library(lubridate)
 
 # ---- Load everything this script needs, so it can run independently ----
-nyse_common          <- readRDS("data/raw/decision1/alternative_B/nyse_common_1926_1968.rds")
 eligible_securities  <- readRDS("data/processed/decision1/alternative_B/eligible_securities.rds")
 periods              <- readRDS("data/processed/decision1/alternative_B/periods.rds")
+first_month_long     <- readRDS("data/processed/decision1/alternative_B/first_month_long.rds")
 
 # ---- Count securities available in first month of each testing period ----
-securities_available <- periods |>
-  rowwise() |>
-  mutate(
-    n_available = nyse_common |>
-      filter(date >= testing_start, date < testing_start %m+% months(1)) |>
-      pull(permno) |>
-      n_distinct()
-  ) |>
-  select(period_id, n_available) |>
-  ungroup()
+# Uses the same first_month_long list built in script 02, so both scripts
+# agree on who counts as "available" — based on listing status, not on
+# whether CRSP happens to have a valid return that month.
+securities_available <- first_month_long |>
+  group_by(period_id) |>
+  summarise(n_available = n_distinct(permno), .groups = "drop")
 
 securities_available
 

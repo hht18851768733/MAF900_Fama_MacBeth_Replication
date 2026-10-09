@@ -31,3 +31,6 @@ To be completed.
 ## Reason for the decision
 
 To be completed.
+
+# Decision Record
+
