@@ -1,24 +1,26 @@
-# Part 3: Unified implementation rules and code revisions
+# Part 3: Current implementation rules
 
 Group members: Haitian Hu and Bharat Goel  
 Updated: 9 October 2026  
-Part 3 implementation of the alternatives agreed in Part 2. Final selections follow coding, comparison and reciprocal review.
+Status: DP1 eligibility and Table 1 count comparisons completed; final approach selection and downstream analysis remain pending.
 
-## 1. What this update changes
+## 1. Purpose and relationship to Part 2
 
-Our submitted Part 2 compared strict complete history with a 90% valid-observation rule. It described a 48-month formation period without explaining the later 84-month formation windows. This note clarifies that omission and specifies how the alternatives should work with different lengths of listed history.
+This document records the rules used by our current Part 3 implementations. Part 2 proposed a strict-history alternative and an alternative allowing missing monthly returns. It specified 48/48 versus 44/48 formation observations and 60/60 versus 54/60 estimation observations, but did not fully explain how the formation rules would apply to the later 84-month windows.
 
-We retain Alternative B's 44/48 formation threshold in the first block and 54/60 initial-estimation threshold. We apply the formation percentage to each security's expected listed-history months in later blocks. This requires an explicit change from Bharat's current fixed 48-valid-month rule for blocks 2–9.
+Our current clarification keeps those first-period and estimation thresholds. For later formation windows, A requires a run of at least 48 consecutive valid calendar months, while B requires at least 48 valid months without a continuity requirement. The full 84-month formation windows remain unchanged.
 
-This version also replaces the 8 October clarification's additional floor of 48 **valid** formation observations. There is a shared minimum of 48 months of **calendar coverage**, but Alternative B need not have 48 valid formation returns.
+These are group implementation choices for comparing the treatment of incomplete monthly histories. The 90% tolerance, its denominators, and A's consecutive-month criterion must not be presented as explicit instructions from the paper or the assignment. In particular, B's allowance of 54 valid estimation months is our missing-data alternative, rather than a literal requirement for 60 valid monthly observations.
 
-The two DP1 alternatives and the pre-specified 90% threshold were already established in Part 2. In Part 3, we implement both alternatives, review whether the code follows each rule, and compare their effects on sample retention, beta estimates and portfolio results. This note adds the implementation details for later 84-month formation windows and their denominators while carrying forward the Part 2 comparison. Keep the submitted Part 2 unchanged and record these implementation details in GitHub.
+**This version supersedes the earlier rule in this file that applied `ceiling(0.90 * N_form)` to later formation histories.** We do not require B to have 76 valid months out of 84, or A to have valid returns throughout every listed month of the 84-month window. Bharat's current 44/48 formation thresholds are retained.
 
-## 2. Shared date configuration
+Keep the submitted Part 2 unchanged. Record this clarification, the comparison evidence and the eventual choices in GitHub. The alternatives are defined for implementation; neither has yet been selected as the final pipeline.
 
-Use one common date configuration for both alternatives. Bharat's current nine-block configuration can be retained.
+## 2. Common time windows
 
-| Block | Formation | Initial estimation | Testing |
+Both alternatives use the following dates.
+
+| Period | Formation | Initial estimation | Testing |
 | --- | --- | --- | --- |
 | 1 | Jan 1926–Dec 1929 | Jan 1930–Dec 1934 | Jan 1935–Dec 1938 |
 | 2 | Jan 1927–Dec 1933 | Jan 1934–Dec 1938 | Jan 1939–Dec 1942 |
@@ -30,121 +32,189 @@ Use one common date configuration for both alternatives. Bharat's current nine-b
 | 8 | Jan 1951–Dec 1957 | Jan 1958–Dec 1962 | Jan 1963–Dec 1966 |
 | 9 | Jan 1955–Dec 1961 | Jan 1962–Dec 1966 | Jan 1967–Jun 1968 |
 
-The first formation window is 48 months and later windows are 84 months. Every initial estimation window is 60 months. Do not truncate the later formation windows to 48 months. All analysis must respect the final testing cutoff of June 1968, even if the extraction includes later records.
+Period 1 has a 48-month formation window; Periods 2–9 have 84-month formation windows. Every initial estimation window contains 60 months. A 48-month eligibility requirement does not shorten an 84-month window.
 
-These are initial-estimation dates. They do not replace the separate updating of risk measures during the testing periods; the shared downstream implementation must document that schedule and avoid using current or future test returns to construct a month's explanatory risk measures.
+The extraction includes records through December 1968, but the final testing period ends in June 1968. The year-only label `1967-1968` in B's current table does not extend its coded testing endpoint.
 
-## 3. Shared sample, coverage and missing-data definitions
+## 3. Shared data and sample definitions
 
-Retain one common NYSE common-stock mapping for both alternatives. For the legacy CRSP fields used in the current scripts, the working mapping is date-matched exchange/share history with `exchcd == 1` and `shrcd %in% c(10, 11)`. Record this mapping as an implementation choice and apply it consistently.
+### Data source and monthly validity
 
-Create one shared security-month panel before filtering out invalid returns. Preserve the dated listing and exchange/share-status records needed to distinguish calendar coverage from return availability.
+Use the same input snapshot for both alternatives:
 
-For each security and block, define:
+- Legacy CRSP monthly stock returns from `crsp.msf`.
+- Exchange/share-code history from `crsp.msenames`, matched to each return date using `namedt` and `nameendt`.
+- NYSE common stocks defined by `exchcd == 1` and `shrcd %in% c(10, 11)`.
+- A valid return in the current implementation means `!is.na(ret)`. A zero return is valid. Keep missing returns in the downloaded input; do not replace them with zero or interpolate them.
 
-- `available_first_month`: the security is available under the shared sample definition in the first testing month. Use dated status/listing information; a missing numerical return alone must not make an otherwise available security unavailable.
-- `N_form`: the number of expected months of the security's qualifying listed history within the full formation window, determined from dated listing/status records before dropping missing returns.
-- `n_form`: the number of those months with a valid stock return.
-- `N_est`: expected qualifying listed-history months within the fixed 60-month initial estimation window.
-- `n_est`: the number of those initial-estimation months with a valid stock return.
+The comparison run used the same two input RDS files in separate A and B directories. This keeps the implementations separate while holding the input data fixed.
 
-Both alternatives require `available_first_month == TRUE`, `N_form >= 48`, and coverage of every month of the initial estimation window, represented by `N_est == 60`.
+### Listed-history coverage
 
-Months before listing are not temporary missing returns. A missing row during an established qualifying listing spell is an expected month with an unavailable return. Do not infer coverage from the first and last nonmissing returns. Use the same dated mapping for exchange changes, listing-spell breaks and boundary months; distinguish documented noncoverage from a temporary return gap.
+Listed coverage and valid-return counts are separate concepts. Construct coverage from the qualifying exchange/share-code date segments rather than from the first and last nonmissing returns.
 
-Confirm that there is only one observation per `permno` and calendar month. Investigate duplicate date-range matches before counting months. Normalise special missing-value codes according to the CRSP product used; `!is.na(ret)` is sufficient only if such codes have already been converted correctly. A valid zero return counts as valid. Do not fill missing returns with zero or interpolate them.
+The implemented monthly convention includes each calendar month touched by a qualifying segment: both segment endpoints are rounded down to the start of their month, the intervening months are expanded, and repeated security-month coverage is counted once. This is a month-overlap convention, not a claim that the security was listed on every day of a boundary month.
 
-Use one documented common market-return proxy and return-unit convention. Check its monthly coverage in the common preprocessing. Estimate betas from valid stock/market pairs and save the actual regression observation counts; do not assume the stock-return count always equals the paired count.
+Both alternatives require:
 
-## 4. Decision Point 1 eligibility rules
+- At least 48 qualifying listed calendar months within the formation window.
+- Coverage of all 60 calendar months within the initial estimation window.
 
-| Requirement | Alternative A: Haitian | Alternative B: Bharat |
+The formation coverage requirement is **at least 48 months within the window**, not coverage of the entire later 84-month window. This common coverage check does not itself impose a consecutive formation-history requirement.
+
+### First testing month and Table 1
+
+A security must appear in the qualifying listing-based roster for the first testing month. A missing return in that month alone does not remove it from the available roster.
+
+Within each alternative, the same saved `first_month_long.rds` is used for eligibility and Table 1's available-security count. Across alternatives, the comparison script checks equality of the actual `period_id, permno` rosters, not only the totals.
+
+Table 1's eligible securities must be a subset of the available roster. A and B use the same candidate roster but may retain different eligible samples.
+
+## 4. Decision Point 1: implemented rules
+
+| Requirement | Alternative A — Haitian | Alternative B — Bharat |
 | --- | --- | --- |
 | Available in first testing month | Required | Required |
-| Formation calendar coverage | `N_form >= 48` | `N_form >= 48` |
-| Formation valid returns | `n_form == N_form` | `n_form >= ceiling(0.90 * N_form)` |
-| Initial estimation calendar coverage | `N_est == 60` | `N_est == 60` |
-| Initial estimation valid returns | `n_est == 60` | `n_est >= 54` |
+| Formation listed coverage | At least 48 calendar months | At least 48 calendar months |
+| Period 1 formation returns | All 48 months valid | At least 44 of 48 months valid |
+| Periods 2–9 formation returns | At least one run of 48 consecutive valid calendar months within the 84-month window | At least 48 valid months anywhere within the 84-month window; continuity not required |
+| Initial estimation listed coverage | All 60 calendar months | All 60 calendar months |
+| Initial estimation returns | All 60 months valid | At least 54 of 60 months valid |
 
-Valid observations under B do not need to be consecutive. Formation betas use all valid paired observations in the relevant full formation window.
+For B, `ceiling(0.90 * 48) = 44` applies to the first formation period, and `ceiling(0.90 * 60) = 54` applies to initial estimation. The later formation threshold is a fixed count of 48 valid months; it is not a 90% threshold on 84 months or on security-specific listed coverage.
 
-Examples:
+For A, continuity is assessed using calendar-month identifiers. A missing calendar month breaks a run even if it has no return row. The qualifying 48-month run may occur anywhere within the formation window. Missing months outside that run do not automatically disqualify the security. A is therefore stricter on formation continuity and estimation completeness, but is not a complete-case rule over all 84 formation months.
 
-| Expected formation months | A: valid months required | B: valid months required |
-| --- | ---: | ---: |
-| 48 | 48 | 44 |
-| 60 | 60 | 54 |
-| 84 | 84 | 76 |
-
-Thus a security with 84 expected formation months and 50 valid returns passes Bharat's current fixed-48 rule but fails this revised 90% rule. A security with only 48 expected months within a later 84-month window needs 44 valid returns under B; it does not automatically need 76.
-
-The eligibility logic, after constructing the shared panel, is:
+The following pseudocode summarises eligibility after coverage, validity and the first-month roster have been constructed:
 
 ```r
-eligible_A <- available_first_month &
-  N_form >= 48 & N_est == 60 &
-  n_form == N_form & n_est == 60
+common_ok <- in_first_month &
+  formation_listed_months >= 48 &
+  estimation_listed_months == 60
 
-formation_threshold_B <- ceiling(0.90 * N_form)
+eligible_A <- common_ok &
+  formation_longest_run >= 48 &
+  estimation_valid_months == 60
 
-eligible_B <- available_first_month &
-  N_form >= 48 & N_est == 60 &
-  n_form >= formation_threshold_B & n_est >= 54
+formation_threshold_B <- if_else(period_id == 1, 44, 48)
+
+eligible_B <- common_ok &
+  formation_valid_months >= formation_threshold_B &
+  estimation_valid_months >= 54
 ```
 
-The snippet describes the rule, not a drop-in replacement for the existing scripts: the shared coverage and availability fields must be constructed first.
+Both implementations evaluate estimation within a fixed 60-month window. B's current `estimation_listed_months >= 60` condition is equivalent to 60 when counting distinct months in that window.
 
-Retain both outputs. Compare eligible-security counts, exclusion reasons, sample overlap, paired observation counts, formation-beta estimates and their precision, and the membership of the 20 beta-sorted portfolios. Select the final DP1 implementation after review; do not choose solely by closeness to the original reported counts.
+This comparison tests two missing-history policies. It changes both formation eligibility and estimation completeness, so the overall difference must not be attributed to formation continuity alone. The consecutive-run rule also favours uninterrupted histories; our later discussion should consider the resulting sample selection.
 
-## 5. Required revisions to the uploaded DP1 B scripts
+### Formation beta estimation: next-stage rule
 
-The uploaded ZIP contains `01_data_extraction.R`, `02_sample_construction.R` and `03_table1_securities_available.R`. This review checks code logic only: the ZIP does not include the data or empirical outputs needed to validate numerical results.
+After eligibility is determined, estimate formation betas using all valid stock/market paired observations in the full formation window. Do not restrict A's regression to its qualifying 48-month run. Record the paired observation count separately from the stock-return count.
 
-| Item | Current implementation | Required action |
+The market series and regression details must be documented consistently before this stage is run. Current Table 1 count outputs do not establish effects on beta estimates, portfolio assignments or Tables 2–3.
+
+## 5. Recorded DP1 comparison
+
+The following results are taken from the uploaded [comparison summary](output/tables/decision1_comparison_summary.csv). The local comparison completed its first-month roster identity check. A is a subset of B in every period.
+
+| Period | Available | Eligible A | Eligible B | Both | A only | B only |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | 690 | 269 | 390 | 269 | 0 | 121 |
+| 2 | 761 | 465 | 562 | 465 | 0 | 97 |
+| 3 | 789 | 554 | 588 | 554 | 0 | 34 |
+| 4 | 894 | 662 | 687 | 662 | 0 | 25 |
+| 5 | 996 | 727 | 733 | 727 | 0 | 6 |
+| 6 | 1036 | 784 | 787 | 784 | 0 | 3 |
+| 7 | 1041 | 823 | 839 | 823 | 0 | 16 |
+| 8 | 1139 | 820 | 845 | 820 | 0 | 25 |
+| 9 | 1229 | 797 | 821 | 797 | 0 | 24 |
+
+The [exclusion summary](output/tables/decision1_exclusion_summary.csv) classifies securities retained by B but rejected by A:
+
+| Period | Formation only | Estimation only | Both requirements |
+| --- | ---: | ---: | ---: |
+| 1 | 50 | 49 | 22 |
+| 2 | 48 | 40 | 9 |
+| 3 | 21 | 11 | 2 |
+| 4 | 8 | 16 | 1 |
+| 5 | 3 | 3 | 0 |
+| 6 | 1 | 2 | 0 |
+| 7 | 0 | 16 | 0 |
+| 8 | 1 | 24 | 0 |
+| 9 | 2 | 22 | 0 |
+
+These categories are mutually exclusive. “Formation only” means failure of A's formation rule but satisfaction of its estimation rule; “Estimation only” means the reverse. “Both requirements” means failure of both. None of these B-only observations was classified as a listed-coverage failure or an unexplained case.
+
+The largest count differences occur in Periods 1 and 2. In Periods 7–9, estimation completeness accounts for most of the difference. These are descriptions of this run, not evidence that one alternative produces better beta estimates.
+
+The comparison counts security-period observations. A security can appear in more than one period; totals across periods must not be described as distinct stocks.
+
+Supporting outputs:
+
+- [Table 1 A](output/tables/table1_a.csv) and [dated A counts](output/tables/table1_a_detail.csv).
+- [Table 1 B](output/tables/table1_b.csv).
+- [Membership comparison](output/tables/decision1_membership_comparison.csv).
+- [B-only securities](output/tables/decision1_B_only_securities.csv) and [their diagnostic fields](output/tables/decision1_B_only_diagnostics.csv).
+
+These files support eligibility and sample-overlap findings. They do not replace reciprocal review or the final decision record.
+
+## 6. Decision Point 2: retain the two alternatives
+
+Use the **same selected DP1 sample and portfolio assignments** as the input to both DP2 alternatives. Hold the market data, constituent roster and entry/exit/delisting treatment fixed so the comparison isolates portfolio-month missing-return handling.
+
+| Rule | Alternative A — Bharat | Alternative B — Haitian |
 | --- | --- | --- |
-| Date windows in script 02 | First formation window 48 months; later windows 84 months; final test ends June 1968 | Retain the dates and move/reuse the configuration in shared code. |
-| Formation threshold in script 02 | `if_else(period_id == 1, 44, 48)` | Replace with `ceiling(0.90 * N_form)` after building coverage. The first block still requires 44; later requirements depend on listed coverage. |
-| Formation coverage | Counts nonmissing returns but does not construct expected listed months | Preserve dated status history from script 01; construct `N_form` independently of `n_form`; require `N_form >= 48`. |
-| Initial estimation coverage | Requires at least 54 nonmissing returns only | Keep the 54-return rule, and additionally require complete 60-month calendar coverage using `N_est == 60`. |
-| First-testing-month availability | Script 03 calculates an available-security count; script 02 does not use the underlying list when assigning eligibility | Build a shared `period_id, permno` availability list and incorporate it into eligibility. Securities that exited before the first test month must not enter the eligible sample. |
-| Table 1 sample relationship | Available and eligible totals are calculated separately | Derive both from the same availability list. Eligible securities must be a subset of available securities; check `n_eligible <= n_available` and the actual identities. |
-| Missing-code and duplicate handling | Validity is based on `!is.na(ret)`; no uniqueness check is shown | Verify the imported missing-code representation and security-month uniqueness. These are checks to perform, not confirmed data errors. |
-| Diagnostic output | Saves eligibility and Table 1 counts | Also save coverage counts, valid counts, threshold, availability flag and exclusion reasons for each security/block. Save paired counts and beta diagnostics when regressions are added. |
-| Final test-period label in script 03 | Shows only `1967-1968` although the coded endpoint is June | Make the June 1968 cutoff explicit in the final table or a table note. |
+| Portfolio return | Arithmetic mean of valid current-member returns, with equal weights among those members | Arithmetic mean only when every current member has a valid return |
+| Some current-member returns missing | Calculate using the valid members | Record the portfolio-month as missing |
+| No valid member returns, or an empty portfolio | Record missing | Record missing |
 
-Before writing RDS/CSV outputs, create the required directories. The ZIP alone does not establish whether those directories already exist in the repository.
+Apply the common membership and exit rules before determining which current members have missing returns. A temporary missing return does not permanently remove a stock from the portfolio. Keep valid zero returns and do not fill unavailable returns with zero.
 
-The current ZIP does not yet implement formation-beta estimation, assignment to 20 portfolios, initial risk-measure estimation, or DP2. Treat these as remaining stages, rather than errors in code that has not yet been supplied.
+Save expected membership, valid membership and returns for each portfolio-month. Compare usable portfolio-month counts, effective portfolio size, returns on common valid dates and downstream results.
 
-## 6. Decision Point 2: retain the submitted alternatives
+These alternatives remain the agreed DP2 design. They have not yet been implemented in the current repository.
 
-Run both DP2 alternatives from the **same selected DP1 sample and portfolio assignments**, with the same market data, dated constituent roster and entry/exit/delisting rules.
+## 7. Run order and file locations
 
-- Alternative A — Bharat: take the arithmetic mean of valid current-constituent returns. Reweight equally among those valid constituents. If none is valid, record `NA`.
-- Alternative B — Haitian: calculate the equal-weighted return only when every current constituent has a valid return. If at least one temporary return is missing, record `NA`. An empty portfolio also has return `NA`.
+Run scripts from the project root.
 
-A temporary missing return does not permanently remove a security from its portfolio. Apply documented exits and the shared treatment of observed delisting returns before classifying a gap as temporary. Keep valid zeros and retain the full monthly calendar. Do not replace unavailable returns with zero.
+1. Create the relevant `data/raw/decision1/alternative_A/`, `data/raw/decision1/alternative_B/`, `data/processed/decision1/alternative_A/`, `data/processed/decision1/alternative_B/` and `output/tables/` directories.
+2. Prepare the two common input files, `nyse_common_1926_1968.rds` and `nyse_listing_segments.rds`, using the same CRSP snapshot and extraction definitions. Store identical copies in the A and B raw-data directories for the comparison. A separate extraction is unnecessary if the shared files are already available.
+3. Run each alternative's `02_sample_construction.R`, followed by its `03_table1_securities_available.R`.
+4. Run [04_compare_decision1.R](code/common/04_compare_decision1.R) after both sets of processed outputs exist.
 
-Save expected membership, valid membership and the portfolio return for every portfolio-month. Compare coverage and effective portfolio size, returns on common valid dates, downstream risk statistics and availability of the 20-portfolio cross section.
+Implementation sources:
 
-This update also proposes a shared downstream rule for the main Table 3 comparison: use months with all 20 required portfolio returns and valid explanatory risk measures under the relevant DP2 alternative. Keep and report incomplete months and reasons for exclusion. Use the same rule in both alternatives. Any regression using fewer portfolios should be separately labelled and documented rather than silently changing the main sample. Record this downstream clarification in GitHub; it was not fully specified in the submitted Part 2. If usable months are insufficient for an estimate, report that limitation rather than filling missing values or silently relaxing the rule.
+- [A sample construction](code/decision1/alternative_A/02_sample_construction.R).
+- [B sample construction](code/decision1/alternative_B/02_sample_construction.R).
 
-## 7. Execution, review and records
+Keep the two alternatives in their separate code and data directories. GitHub stores the scripts, documentation and comparison outputs; WRDS credentials and licensed raw data remain local.
 
-1. Prepare shared date configuration, monthly data, validity definitions, listed-history coverage, first-test-month availability and the market proxy.
-2. Haitian implements DP1-A; Bharat revises and implements DP1-B. Produce candidate Table 1 outputs, beta estimates, portfolio assignments and comparison diagnostics.
-3. Each member reviews the other's DP1 implementation. Record the final selection and reasons in `decisions/decision1.md`.
-4. Use the selected DP1 output as the common input. Bharat implements DP2-A; Haitian implements DP2-B.
-5. Each member reviews the other's DP2 implementation. Compare portfolio-month coverage and downstream effects; record the selection and reasons in `decisions/decision2.md`.
-6. Use the selected pipeline for final Tables 1–3. Retain alternative code and outputs so the differences can be inspected.
-7. Update the README with run order, dependencies, data-access instructions, output locations and AI disclosure. Make progressive commits and keep credentials and licensed raw data outside the public repository.
+## 8. Review, decisions and remaining work
 
-Keep shared code under `code/common/`, alternative implementations under `code/decision1/alternative_A/`, `code/decision1/alternative_B/`, `code/decision2/alternative_A/` and `code/decision2/alternative_B/`, and the selected pipeline under `code/final/`. Keep the four reciprocal-review records under `reviews/` and table outputs under `output/tables/`.
+Completed at this stage:
 
-The decision records should link the 90% threshold and the 44/48 and 54/60 rules to the agreed Part 2 alternatives. Separately document the omitted 84-month windows, the coverage denominator, the replacement of Bharat's later fixed-48 threshold, the removal of the 8 October extra valid-month floor, and the added Table 3 cross-section rule. Distinguish confirmed implementation omissions from data checks and unfinished stages.
+- Both DP1 eligibility implementations and Table 1 count outputs.
+- A local rerun of B using the same inputs as A, reproducing Bharat's reported eligible counts.
+- First-month roster comparison, eligible-set overlap and B-only exclusion diagnostics.
+
+Next steps:
+
+1. Update [decision1.md](decisions/decision1.md) to describe the implemented later-period A rule and the comparison results. Its existing broad description of B as a 90% rule must be read with the stage-specific thresholds above.
+2. Complete reciprocal DP1 reviews: Haitian reviews B and Bharat reviews A. Execution checks alone do not establish that both reviews are complete.
+3. Document and implement the common market-return series, formation-beta regression, sorting and tie handling for 20 portfolios, initial risk estimates, and risk-measure updates during testing.
+4. Review the resulting sample, beta and portfolio differences, and record the final DP1 selection with reasons. A larger sample or a closer match to the original counts is not sufficient on its own.
+5. Implement and compare both DP2 alternatives using the same selected DP1 inputs. Record the choice in [decision2.md](decisions/decision2.md).
+6. Complete the selected pipeline for Tables 1–3 and update the README with run order, dependencies, data access and AI assistance.
+
+The exact market proxy, risk-update schedule, entry/exit and delisting treatment, and Table 3 regression specification and usable-month rule remain to be documented before downstream execution. The earlier suggestion to require a complete 20-portfolio cross section in every Table 3 regression is not treated here as an already implemented or selected rule. Apply and document a common comparison convention, report missing cross sections, and avoid using current or future testing returns to construct a month's explanatory risk measures.
+
+This document records current implementation rules and evidence. Formal alternative selection and any new downstream choices belong in the decision records, with supporting results and group review.
 
 ## Reference
 
 Fama, E. F., & MacBeth, J. D. (1973). Risk, return, and equilibrium: Empirical tests. *Journal of Political Economy, 81*(3), 607–636. https://doi.org/10.1086/260061
 
-Source document: the group's submitted *Fama and MacBeth 1973 Group Replication Strategy* (Assessment 3 Part 2). Code reviewed: the three R scripts in Bharat's uploaded `alternative_B.zip`.
+
+
+
