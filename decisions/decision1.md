@@ -1,99 +1,91 @@
-# Decision Record
+# Decision 1 — Table 1 Sample Eligibility
+
+**Group:** Haitian Hu and Bharat Goel  
+**Decision date:** 11 October 2026  
+**Selected approach:** Alternative B, implemented by Bharat Goel and agreed at the group meeting.
 
 ## Issue investigated
 
-How should intermittent missing monthly return observations be treated when
-determining whether a security has sufficient historical data to be included
-in the replication sample? Fama and MacBeth (1973, p. 617) require a security
-to have data for all 5 years of the preceding estimation period and at least
-4 years of the portfolio-formation period, but do not specify how to handle a
-security with one or more missing monthly returns inside those windows, nor
-how to distinguish a security that was never listed during part of a window
-from one that was listed but has gaps in its return data.
+We compared two ways of handling missing monthly stock returns when determining eligibility for Table 1. The purpose was to distinguish insufficient listed history from missing returns within an otherwise eligible history, while keeping the formation, estimation and testing calendar windows unchanged.
 
-## Alternative A
+The 90% tolerance and the consecutive-month condition described below are our implementation choices. They are not thresholds or continuity requirements explicitly imposed by the paper or the assignment.
 
-A strict complete-case rule: a security must have a valid, non-missing
-return in every month of the required window (48 of 48 formation months,
-60 of 60 estimation months) to be included. Any gap disqualifies the
-security for that period.
+## The two alternatives
 
-## Alternative B
+Haitian implemented Alternative A; Bharat implemented Alternative B.
 
-A threshold rule: a security qualifies if it has a valid return
-in at least 90% of the required months, allowing isolated gaps. Specifically:
-- Estimation period: at least 54 of 60 months valid (90% of the paper's
-  stated "all 5 years" requirement).
-- Formation period: at least 44 of 48 months valid for Period 1 (whose
-  formation window is exactly 48 months), and at least 48 of the available
-  months valid for Periods 2-9 (whose formation windows run 84 months,
-  but the paper's "at least 4 years" is read as a fixed 48-month minimum
-  rather than a percentage of each period's specific window length).
+| Requirement | Alternative A | Alternative B |
+| --- | --- | --- |
+| First formation period: 48 calendar months | All 48 monthly returns valid | At least 44 valid monthly returns |
+| Later formation periods: 84 calendar months | At least one run of 48 consecutive valid calendar months within the window | At least 48 valid monthly returns within the window; continuity not required |
+| Estimation period: 60 calendar months | All 60 monthly returns valid | At least 54 valid monthly returns |
 
-Following group review, two refinements were incorporated:
-1. Listed history (from CRSP exchange/share-code date ranges, `namedt` to
-   `nameendt`) is checked separately from valid-return coverage. A security
-   must be listed as NYSE common stock for the full formation window
-   (≥48 months) and the full estimation window (=60 months), in addition
-   to meeting the valid-return thresholds above. This separates "wasn't
-   listed yet" from "was listed but has a data gap."
-2. A single shared list of securities listed in the first month of each
-   testing period is constructed once and used both to determine
-   eligibility (a security must appear in this list to be eligible) and
-   to compute the "securities available" count for Table 1, rather than
-   each script independently deriving its own version of this list. A
-   missing return alone does not remove a security from this list; only
-   non-listing does.
+Both alternatives also require:
+
+- NYSE common-stock classification and the same downloaded input data for the comparison.
+- At least 48 listed months within the formation window and all 60 listed months within the estimation window, checked separately from valid returns.
+- Listing in the first testing month. A missing return in that month alone does not remove a security from the candidate roster.
+- The same first-testing-month roster for eligibility and the Table 1 availability count.
+
+B's 90% threshold applies to the first formation period (`ceiling(0.90 * 48) = 44`) and every estimation period (`0.90 * 60 = 54`). For later formation periods, the threshold is a fixed 48 valid months, not 90% of 84 months or of each security's listed history.
+
+The later formation windows remain 84 months long. A does not require 84 valid months, and B does not require 76. The last testing period ends in June 1968.
 
 ## Expected differences
 
-Alternative A was expected to produce a more uniform estimation sample but
-exclude more securities due to isolated gaps, narrowing the sample and
-potentially the range of betas available for portfolio sorting. Alternative
-B was expected to retain more securities, at the cost of some securities'
-betas being estimated on fewer effective observations than others.
+We expected B to retain all securities selected by A and admit additional securities with incomplete or interrupted return histories. A provides complete estimation returns and a continuous qualifying formation history. B permits fewer valid observations and different effective observation counts across securities.
 
-Incorporating the listed-history check was expected to further reduce
-Alternative B's eligible-security counts relative to the valid-returns-only
-version, since it adds a genuinely separate requirement rather than relaxing
-the existing one. The shared first-month list was expected to have a smaller
-effect, since most securities with a valid return in a given month are also
-listed in that month.
+These are sample-selection trade-offs. Neither greater sample size nor stricter completeness alone establishes better beta estimates.
 
 ## Observed differences
 
-[To be completed once Alternative A's results are available for comparison.]
+The local comparison used the same input snapshot. The first-testing-month candidate lists matched, and A was a subset of B in every period.
 
-Alternative B's eligible-security counts, after incorporating refinements: 390, 562, 588, 687, 733, 787, 839,
-845, 821 across the nine periods, against the paper's reported 435, 576, 
-607, 704, 751, 802, 856, 858, 845 — consistently 2-10% below the original.
-Period 1 showed the largest gap (390 vs. 435, ~10%), likely reflecting the
-stricter requirement that a security be listed at both the start of the
-1926-29 formation window and the end of the 1930-34 estimation window, a
-harder bar to clear in the earliest, smaller NYSE universe.
+| Period | Available | A eligible | B eligible | B minus A |
+| --- | ---: | ---: | ---: | ---: |
+| 1 | 690 | 269 | 390 | 121 |
+| 2 | 761 | 465 | 562 | 97 |
+| 3 | 789 | 554 | 588 | 34 |
+| 4 | 894 | 662 | 687 | 25 |
+| 5 | 996 | 727 | 733 | 6 |
+| 6 | 1036 | 784 | 787 | 3 |
+| 7 | 1041 | 823 | 839 | 16 |
+| 8 | 1139 | 820 | 845 | 25 |
+| 9 | 1229 | 797 | 821 | 24 |
 
+B adds 351 security-period observations across the nine periods. Of these, 134 fail only A's formation rule, 183 fail only A's estimation rule, and 34 fail both. These are security-period counts, not counts of unique securities across the whole study. No A-only observations were found.
 
-Securities-available counts, computed from the shared first-month list:
-690, 761, 789, 894, 996, 1036, 1041, 1139, 1229, each within 1 unit of the
-count derived directly from CRSP return rows prior to the refinement. This
-indicates the listed-history distinction mattered substantially more for
-the multi-year eligibility requirement than for the single-month
-availability count. Both remained 2-3% below the paper's reported figures
-(710, 779, 804, 908, 1011, 1053, 1065, 1162, 1261) across all nine periods.
+The observed differences are therefore consistent with the intended missing-return rules. Their implications for beta estimates and portfolio results have not yet been established by these diagnostics.
 
-## Review findings
+## Key review findings
 
-[To be completed after the group reviews both implementations together,
-per the Part 2 workflow. Initial review of Alternative B (recorded above)
-identified two gaps: listed history was not checked separately from return
-validity, and the "securities available" and eligibility calculations used
-two independently derived first-month lists rather than one shared list.
-Both were addressed in the implementation described above.]
+The inspected B implementation applies the agreed thresholds, separates listed history from valid-return coverage, and reuses its saved first-month roster in the Table 1 script. The comparison code checks candidate identities as well as sample counts. Based on the inspected code, reported local execution and saved diagnostics, no substantive error affecting the current Table 1 results was identified.
 
-## Selected approach
+The main clarification is methodological: allowing 54 valid returns within the 60-month estimation window is a group-defined tolerance, not the same as requiring 60 valid returns. Similarly, B's later formation rule can allow substantial gaps because it requires 48 valid months within 84 months.
 
-[To be completed.]
+Individual review records are maintained separately in [the review of A](../reviews/decision1_A_review.md) and [the review of B](../reviews/decision1_B_review.md). This joint decision record does not replace either student's reciprocal review.
 
-## Reason for the decision
+## Selected approach and reason
 
-[To be completed.]
+We agreed at our meeting on 11 October 2026 to use **Bharat's Alternative B** for the final Table 1 sample and as the common starting point for Table 2.
+
+We prefer B because it allows incomplete return histories while retaining explicit listed-history requirements and the original calendar windows. A's consecutive formation requirement and complete estimation requirement exclude additional securities; our comparison makes those exclusions visible. We accept B's tolerance as a practical implementation choice for this replication and retain A as the stricter comparison.
+
+The decision is not based solely on retaining more securities or obtaining counts closer to the published table. We do not claim that B eliminates selection bias or produces more accurate beta estimates.
+
+## Implementation and next steps
+
+1. Incorporate B's sample-construction and Table 1 logic into `code/final/`, using shared code where appropriate. The final workflow must recreate its inputs without depending on scripts or intermediate results produced only by the alternative-development folders.
+2. Preserve both DP1 implementations, their outputs and reciprocal reviews in the repository.
+3. Use the selected DP1 sample as the common basis for both DP2 alternatives. Hold the market data, portfolio formation and membership rules constant when comparing their missing-return treatments.
+4. Record the DP2 choice separately in `decisions/decision2.md`. Selecting B for DP1 does not select a DP2 alternative.
+
+## Supporting evidence
+
+- [Comparison summary](../output/tables/decision1_comparison_summary.csv)
+- [Exclusion diagnostics](../output/tables/decision1_exclusion_summary.csv)
+- [Comparison code](../code/common/04_compare_decision1.R)
+- [Alternative B sample construction](../code/decision1/alternative_B/02_sample_construction.R)
+- [Methodology clarification](../part3_methodology_clarification.md)
+
+AI assisted with code inspection, diagnostic summaries and drafting. The group remains responsible for the methodological choice and the accuracy of this record.
