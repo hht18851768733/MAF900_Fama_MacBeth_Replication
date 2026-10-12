@@ -14,7 +14,7 @@ library(lubridate)
 periods              <- readRDS("data/processed/decision1/alternative_B/periods.rds")
 portfolio_betas      <- readRDS("data/processed/decision2/alternative_A/portfolio_betas.rds")
 estimation_betas     <- readRDS("data/processed/decision2/alternative_A/estimation_betas.rds")
-portfolio_returns    <- readRDS("data/processed/decision2/alternative_A/portfolio_returns_altA.rds")
+portfolio_returns    <- readRDS("data/processed/decision2/alternative_A/estimation_portfolio_returns_altA.rds")
 market_index         <- readRDS("data/raw/decision2/alternative_A/market_index.rds")
 
 # ---- Average individual residual SD within each portfolio: s_bar_p(e_i) ----
@@ -22,7 +22,7 @@ avg_resid_sd <- estimation_betas |>
   group_by(period_id, portfolio) |>
   summarise(avg_resid_sd = mean(resid_sd, na.rm = TRUE), .groups = "drop")
 
-# ---- Portfolio-level statistics from testing-period returns ----
+# ---- Portfolio-level statistics from estimation-period returns ----
 portfolio_return_stats <- list()
 
 for (p in 1:9) {
