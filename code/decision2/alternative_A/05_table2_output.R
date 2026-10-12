@@ -96,3 +96,12 @@ table2_journal_all <- map_dfr(1:9, ~ build_journal_table(table2_altA, .x))
 table2_journal_all |> filter(period_id %in% c(2, 4))
 
 write_csv(table2_journal_all, "output/tables/table2_journal_all_periods.csv")
+
+# ---- Filter the journal-style table to just the four comparable periods ----
+
+table2_journal_comparable <- table2_journal_all |>
+  filter(period_id %in% c(2, 4, 6, 8))
+
+table2_journal_comparable
+
+write_csv(table2_journal_comparable, "output/tables/table2_journal_periods_2_4_6_8.csv")
