@@ -10,7 +10,7 @@ library(tidyverse)
 library(lubridate)
 
 periods             <- readRDS("data/processed/decision1/alternative_B/periods.rds")
-portfolio_formation <- readRDS("data/processed/decision2/alternative_A/portfolio_formation.rds")
+portfolio_formation <- readRDS("data/processed/common/decision2/portfolio_formation.rds")
 nyse_common         <- readRDS("data/raw/decision1/alternative_B/nyse_common_1926_1968.rds")
 
 nominal_size <- portfolio_formation |>

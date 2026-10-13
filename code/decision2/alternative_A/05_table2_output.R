@@ -11,11 +11,20 @@ library(tidyverse)
 library(lubridate)
 
 # ---- Load what we need ----
-periods              <- readRDS("data/processed/decision1/alternative_B/periods.rds")
-portfolio_betas      <- readRDS("data/processed/decision2/alternative_A/portfolio_betas.rds")
-estimation_betas     <- readRDS("data/processed/decision2/alternative_A/estimation_betas.rds")
-portfolio_returns    <- readRDS("data/processed/decision2/alternative_A/estimation_portfolio_returns_altA.rds")
-market_index         <- readRDS("data/raw/decision2/alternative_A/market_index.rds")
+periods          <- readRDS("data/processed/decision1/alternative_B/periods.rds")
+estimation_betas <- readRDS("data/processed/common/decision2/estimation_betas.rds")
+market_index     <- readRDS("data/raw/common/market_index.rds")
+portfolio_returns <- readRDS("data/processed/decision2/alternative_A/estimation_portfolio_returns_altA.rds")
+
+# ---- Compute portfolio-level beta and its SE from the shared individual betas ----
+portfolio_betas <- estimation_betas |>
+  group_by(period_id, portfolio) |>
+  summarise(
+    beta_portfolio    = mean(beta_estimation, na.rm = TRUE),
+    se_beta_portfolio = sd(beta_estimation, na.rm = TRUE) / sqrt(n()),
+    n_securities      = n(),
+    .groups = "drop"
+  )
 
 # ---- Average individual residual SD within each portfolio: s_bar_p(e_i) ----
 avg_resid_sd <- estimation_betas |>
