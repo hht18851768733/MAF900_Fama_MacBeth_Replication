@@ -19,7 +19,7 @@ individual_estimates <- readRDS(
 )
 
 market_index <- readRDS(
-  "data/raw/common/market_index.rds"
+  "data/raw/common/market_index_nyse_ew.rds"
 )
 
 periods <- readRDS(
