@@ -37,6 +37,7 @@ testing_portfolio_returns <- testing_panel |>
 # ---- Quick look ----
 estimation_portfolio_returns |> filter(period_id == 2, portfolio == 1) |> head(12)
 testing_portfolio_returns    |> filter(period_id == 1, portfolio == 1) |> head(12)
+dir.create("data/processed/decision2/alternative_A", recursive = TRUE, showWarnings = FALSE)
 
 saveRDS(testing_portfolio_returns, "data/processed/decision2/alternative_A/portfolio_returns_altA.rds")
 saveRDS(estimation_portfolio_returns, "data/processed/decision2/alternative_A/estimation_portfolio_returns_altA.rds")
