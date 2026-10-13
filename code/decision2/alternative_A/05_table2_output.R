@@ -13,7 +13,7 @@ library(lubridate)
 # ---- Load what we need ----
 periods          <- readRDS("data/processed/decision1/alternative_B/periods.rds")
 estimation_betas <- readRDS("data/processed/common/decision2/estimation_betas.rds")
-market_index     <- readRDS("data/raw/common/market_index.rds")
+market_index     <- readRDS("data/raw/common/market_index_nyse_ew.rds")
 portfolio_returns <- readRDS("data/processed/decision2/alternative_A/estimation_portfolio_returns_altA.rds")
 
 # ---- Compute portfolio-level beta and its SE from the shared individual betas ----
@@ -40,7 +40,11 @@ for (p in 1:9) {
   
   period_returns <- portfolio_returns |>
     filter(period_id == row$period_id) |>
-    inner_join(market_index, by = "date")
+    mutate(month = floor_date(date, "month")) |>
+    inner_join(
+      market_index |> mutate(month = floor_date(date, "month")) |> select(month, mkt_ret),
+      by = "month"
+    )
   
   stats_this_period <- period_returns |>
     group_by(portfolio) |>
@@ -87,13 +91,13 @@ build_journal_table <- function(data, period) {
     arrange(portfolio) |>
     transmute(
       portfolio,
-      `beta_p,t-1`              = sprintf("%.3f", beta_portfolio),
-      `s(beta_p,t-1)`           = sprintf("%.3f", se_beta_correct),
-      `r(Rp,Rm)^2`              = sprintf("%.3f", r_squared),
-      `s(Rp)`                   = sprintf("%.3f", sd_portfolio_return),
-      `s(e_p)`                  = sprintf("%.3f", resid_sd_portfolio),
-      `sbar_p,t-1(e_i)`         = sprintf("%.3f", avg_resid_sd),
-      `s(e_p)/sbar_p,t-1(e_i)`  = sprintf("%.3f", resid_sd_ratio)
+      `beta_p,t-1`                       = sprintf("%.3f", beta_portfolio),
+      `SE of portfolio-regression beta`  = sprintf("%.3f", se_beta_correct),
+      `r(Rp,Rm)^2`                       = sprintf("%.3f", r_squared),
+      `s(Rp)`                            = sprintf("%.3f", sd_portfolio_return),
+      `s(e_p)`                           = sprintf("%.3f", resid_sd_portfolio),
+      `sbar_p,t-1(e_i)`                  = sprintf("%.3f", avg_resid_sd),
+      `s(e_p)/sbar_p,t-1(e_i)`           = sprintf("%.3f", resid_sd_ratio)
     ) |>
     pivot_longer(cols = -portfolio, names_to = "Statistic", values_to = "value") |>
     pivot_wider(names_from = portfolio, values_from = value, names_prefix = "Portfolio ") |>

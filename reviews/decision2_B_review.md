@@ -11,9 +11,10 @@ data, filtered according to NYSE common stocks reconstructing the paper's
 stated equally weighted average of all NYSE stocks rather than relying on
 a pre-built index series. This is a more faithful to the implementation of the paper's 
 own definition than Alternative A's use of CRSP's published ewretd series. 
-The portfolio formation, estimation-period beta re-estimation, and 
-Table 2 statistics follow the same overall structure as Alternative A,
-making the two directly comparable.
+
+Following a subsequent restructuring, market index construction, formation-
+period beta estimation, and portfolio formation have been consolidated into
+a shared common pipeline (code/common/05-09), used by both alternatives.
 
 ## Technical or data-handling issues
 

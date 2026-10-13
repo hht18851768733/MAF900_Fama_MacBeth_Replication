@@ -7,60 +7,36 @@
 # =========================================================
 
 library(tidyverse)
-library(lubridate)
 
-periods             <- readRDS("data/processed/decision1/alternative_B/periods.rds")
-portfolio_formation <- readRDS("data/processed/common/decision2/portfolio_formation.rds")
-nyse_common         <- readRDS("data/raw/decision1/alternative_B/nyse_common_1926_1968.rds")
+estimation_panel <- readRDS("data/processed/common/decision2/estimation_member_month_panel.rds")
+testing_panel    <- readRDS("data/processed/common/decision2/testing_member_month_panel.rds")
 
-nominal_size <- portfolio_formation |>
-  group_by(period_id, portfolio) |>
-  summarise(nominal_n = n(), .groups = "drop")
+# ---- Estimation-period returns: all assigned securities are expected members ----
+estimation_portfolio_returns <- estimation_panel |>
+  group_by(period_id, portfolio, month) |>
+  summarise(
+    n_expected = n(),
+    n_valid    = sum(!is.na(ret)),
+    portfolio_return = if (n_valid > 0) mean(ret, na.rm = TRUE) else NA_real_,
+    .groups = "drop"
+  ) |>
+  rename(date = month)
 
-compute_portfolio_returns <- function(date_start_col, date_end_col) {
-  
-  results <- list()
-  
-  for (p in 1:9) {
-    
-    row <- periods[p, ]
-    
-    members_this_period <- portfolio_formation |>
-      filter(period_id == row$period_id) |>
-      select(permno, portfolio)
-    
-    window_returns <- nyse_common |>
-      filter(
-        permno %in% members_this_period$permno,
-        date >= row[[date_start_col]],
-        date <= row[[date_end_col]]
-      ) |>
-      left_join(members_this_period, by = "permno")
-    
-    returns_this_period <- window_returns |>
-      filter(!is.na(ret)) |>
-      group_by(portfolio, date) |>
-      summarise(
-        portfolio_return = mean(ret),
-        n_valid = n(),
-        .groups = "drop"
-      ) |>
-      mutate(period_id = row$period_id)
-    
-    results[[p]] <- returns_this_period
-  }
-  
-  bind_rows(results) |>
-    left_join(nominal_size, by = c("period_id", "portfolio"))
-}
-
-# ---- Testing-period returns (for Table 3) ----
-portfolio_returns_testing <- compute_portfolio_returns("testing_start", "testing_end")
-saveRDS(portfolio_returns_testing, "data/processed/decision2/alternative_A/portfolio_returns_altA.rds")
-
-# ---- Estimation-period returns (for Table 2) ----
-portfolio_returns_estimation <- compute_portfolio_returns("estimation_start", "estimation_end")
-saveRDS(portfolio_returns_estimation, "data/processed/decision2/alternative_A/estimation_portfolio_returns_altA.rds")
+# ---- Testing-period returns: current members identified via listed_nyse_common ----
+testing_portfolio_returns <- testing_panel |>
+  filter(listed_nyse_common) |>
+  group_by(period_id, portfolio, month) |>
+  summarise(
+    n_expected = n(),
+    n_valid    = sum(valid_return, na.rm = TRUE),
+    portfolio_return = if (n_valid > 0) mean(ret[valid_return], na.rm = TRUE) else NA_real_,
+    .groups = "drop"
+  ) |>
+  rename(date = month)
 
 # ---- Quick look ----
-portfolio_returns_estimation |> filter(period_id == 2, portfolio == 1) |> head(12)
+estimation_portfolio_returns |> filter(period_id == 2, portfolio == 1) |> head(12)
+testing_portfolio_returns    |> filter(period_id == 1, portfolio == 1) |> head(12)
+
+saveRDS(testing_portfolio_returns, "data/processed/decision2/alternative_A/portfolio_returns_altA.rds")
+saveRDS(estimation_portfolio_returns, "data/processed/decision2/alternative_A/estimation_portfolio_returns_altA.rds")
