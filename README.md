@@ -136,6 +136,11 @@ Haitian Hu implemented DP1-A and DP2-B and reviewed DP1-B and DP2-A. Bharat Goel
 
 AI assistance was used for coding, debugging, checks and documentation. The group remains responsible for the implementation, methodological decisions and interpretation of the results.
 
+## Comparison with the original paper
+
+See [Comparison with Fama and MacBeth (1973)](replication_comparison.md)
+for a brief comparison of our final Tables 1–3 with the published results.
+
 ## Reference
 
 Fama, E. F., & MacBeth, J. D. (1973). Risk, return, and equilibrium: Empirical tests. *Journal of Political Economy, 81*(3), 607–636. https://doi.org/10.1086/260061
